@@ -1,0 +1,2 @@
+# fount
+Automated Newsletter Management
