@@ -1,5 +1,17 @@
-import { Mail, Plus, Sparkles } from 'lucide-react'
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { Mail, Sparkles, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
+type Newsletter = {
+  id: string
+  subject: string
+  status: string
+  created_at: string
+  recipient_count?: number
+}
 
 const statusStyles: Record<string, { label: string; bg: string; color: string }> = {
   draft: { label: 'Draft', bg: '#F3F4F6', color: '#6B7280' },
@@ -9,7 +21,33 @@ const statusStyles: Record<string, { label: string; bg: string; color: string }>
 }
 
 export default function NewslettersPage() {
-  const newsletters: { id: string; subject: string; status: string; created_at: string; recipient_count?: number }[] = []
+  const router = useRouter()
+  const [newsletters, setNewsletters] = useState<Newsletter[]>([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadNewsletters = useCallback(async () => {
+    const res = await fetch('/api/newsletters')
+    const data = await res.json()
+    setNewsletters(data ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadNewsletters() }, [loadNewsletters])
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setError(null)
+    const res = await fetch('/api/newsletters/generate', { method: 'POST' })
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data.error ?? 'Generation failed')
+      setGenerating(false)
+      return
+    }
+    router.push(`/newsletters/${data.id}`)
+  }
 
   return (
     <div className="px-8 py-8 max-w-5xl">
@@ -21,16 +59,30 @@ export default function NewslettersPage() {
           </p>
         </div>
         <button
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
+          onClick={handleGenerate}
+          disabled={generating}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           style={{ background: 'var(--fount-accent)' }}
         >
-          <Sparkles size={15} />
-          Generate draft
+          {generating ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+          {generating ? 'Generating…' : 'Generate draft'}
         </button>
       </div>
 
+      {error && (
+        <div className="mb-4 px-4 py-3 rounded-lg text-sm" style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}>
+          {error}
+        </div>
+      )}
+
+      {generating && (
+        <div className="mb-4 px-4 py-3 rounded-lg text-sm flex items-center gap-2" style={{ background: 'var(--fount-accent-light)', color: 'var(--fount-accent)', border: '1px solid #DDD6FE' }}>
+          <Loader2 size={14} className="animate-spin" />
+          Researching your knowledge vault and drafting… this takes ~30 seconds.
+        </div>
+      )}
+
       <div className="rounded-xl border" style={{ background: 'var(--fount-surface)', borderColor: 'var(--fount-border)' }}>
-        {/* Table header */}
         <div
           className="grid grid-cols-12 px-5 py-3 text-xs font-medium border-b"
           style={{ color: 'var(--fount-text-muted)', borderColor: 'var(--fount-border)' }}
@@ -41,7 +93,11 @@ export default function NewslettersPage() {
           <span className="col-span-2 text-right">Recipients</span>
         </div>
 
-        {newsletters.length === 0 ? (
+        {loading ? (
+          <div className="px-5 py-14 flex justify-center">
+            <Loader2 size={24} className="animate-spin" style={{ color: 'var(--fount-text-muted)' }} />
+          </div>
+        ) : newsletters.length === 0 ? (
           <div className="px-5 py-14 text-center">
             <Mail size={32} className="mx-auto mb-3" style={{ color: 'var(--fount-text-muted)' }} />
             <p className="text-sm font-medium" style={{ color: 'var(--fount-text)' }}>No newsletters yet</p>
@@ -53,8 +109,7 @@ export default function NewslettersPage() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
               style={{ background: 'var(--fount-accent)' }}
             >
-              <Plus size={15} />
-              Add to Brain
+              Go to Brain
             </Link>
           </div>
         ) : (

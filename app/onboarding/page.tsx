@@ -16,6 +16,7 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
     niche: '',
     target_audience: '',
@@ -32,11 +33,19 @@ export default function OnboardingPage() {
 
   async function handleFinish() {
     setSaving(true)
-    // TODO: POST to /api/onboarding
-    setTimeout(() => {
+    setError(null)
+    const res = await fetch('/api/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      setError(data.error ?? 'Something went wrong')
       setSaving(false)
-      router.push('/dashboard')
-    }, 1200)
+      return
+    }
+    router.push('/dashboard')
   }
 
   return (
@@ -213,6 +222,10 @@ export default function OnboardingPage() {
                 </p>
               </div>
             </div>
+          )}
+
+          {error && (
+            <p className="mt-4 text-sm" style={{ color: '#DC2626' }}>{error}</p>
           )}
 
           {/* Navigation */}

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdmin } from '@supabase/supabase-js'
-import { retrieveRelevantChunks } from '@/lib/rag'
-import { generateNewsletterDraft } from '@/lib/claude'
+import { runNewsletterPipeline } from '@/lib/agents/pipeline'
 
 const admin = createAdmin(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +13,6 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Load voice profile
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('*')
@@ -25,7 +23,6 @@ export async function POST() {
     return NextResponse.json({ error: 'Complete your profile in Settings first' }, { status: 400 })
   }
 
-  // Check brain has content
   const { count } = await supabase
     .from('knowledge_chunks')
     .select('id', { count: 'exact', head: true })
@@ -35,15 +32,8 @@ export async function POST() {
     return NextResponse.json({ error: 'Add content to your Brain first' }, { status: 400 })
   }
 
-  // Retrieve relevant chunks
-  const query = `${profile.niche} ${profile.newsletter_goal} newsletter content for ${profile.target_audience}`
-  const chunks = await retrieveRelevantChunks(user.id, query)
-  const contextChunks = chunks.map(c => c.content)
+  const { draft, agentTrace } = await runNewsletterPipeline(user.id, profile)
 
-  // Generate draft via Claude
-  const draft = await generateNewsletterDraft({ profile, contextChunks })
-
-  // Save to DB
   const { data: newsletter, error } = await admin
     .from('newsletters')
     .insert({
@@ -58,5 +48,9 @@ export async function POST() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ id: newsletter.id, subject: newsletter.subject })
+  return NextResponse.json({
+    id: newsletter.id,
+    subject: newsletter.subject,
+    agentTrace,
+  })
 }

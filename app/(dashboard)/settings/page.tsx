@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2, Save } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader2, Save, Check } from 'lucide-react'
 
 const toneOptions = [
   { value: 'casual', label: 'Casual', desc: 'Friendly and conversational, like texting a friend' },
@@ -17,20 +17,33 @@ const frequencyOptions = [
 
 const dayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 
+const defaultForm = {
+  display_name: '',
+  niche: '',
+  target_audience: '',
+  tone: 'conversational',
+  sample_sentences: '',
+  newsletter_goal: 'educate',
+  send_frequency: 'weekly',
+  send_day: 'Tuesday',
+  from_name: '',
+  reply_to_email: '',
+}
+
 export default function SettingsPage() {
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({
-    display_name: '',
-    niche: '',
-    target_audience: '',
-    tone: 'conversational',
-    sample_sentences: '',
-    newsletter_goal: 'educate',
-    send_frequency: 'weekly',
-    send_day: 'Tuesday',
-    from_name: '',
-    reply_to_email: '',
-  })
+  const [saved, setSaved] = useState(false)
+  const [form, setForm] = useState(defaultForm)
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(data => {
+        if (data) setForm(f => ({ ...f, ...data }))
+      })
+      .finally(() => setLoading(false))
+  }, [])
 
   function update(key: string, value: string) {
     setForm(f => ({ ...f, [key]: value }))
@@ -39,8 +52,23 @@ export default function SettingsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    // TODO: POST to /api/settings
-    setTimeout(() => setSaving(false), 1000)
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }
+
+  if (loading) {
+    return (
+      <div className="px-8 py-8 max-w-2xl flex items-center gap-2" style={{ color: 'var(--fount-text-muted)' }}>
+        <Loader2 size={16} className="animate-spin" />
+        <span className="text-sm">Loading settings…</span>
+      </div>
+    )
   }
 
   return (
@@ -162,10 +190,16 @@ export default function SettingsPage() {
           type="submit"
           disabled={saving}
           className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-          style={{ background: 'var(--fount-accent)' }}
+          style={{ background: saved ? '#059669' : 'var(--fount-accent)' }}
         >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-          Save settings
+          {saving ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : saved ? (
+            <Check size={15} />
+          ) : (
+            <Save size={15} />
+          )}
+          {saving ? 'Saving…' : saved ? 'Saved' : 'Save settings'}
         </button>
       </form>
     </div>

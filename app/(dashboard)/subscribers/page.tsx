@@ -1,21 +1,48 @@
 'use client'
 
-import { useState } from 'react'
-import { Users, Upload, UserPlus, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Users, Upload, UserPlus, Loader2, Trash2 } from 'lucide-react'
+
+type Subscriber = {
+  id: string
+  email: string
+  first_name?: string
+  status: string
+  subscribed_at: string
+}
 
 export default function SubscribersPage() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [adding, setAdding] = useState(false)
-  const subscribers: { id: string; email: string; first_name?: string; status: string; subscribed_at: string }[] = []
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([])
+  const [loading, setLoading] = useState(true)
+
+  async function loadSubscribers() {
+    const res = await fetch('/api/subscribers')
+    const data = await res.json()
+    setSubscribers(data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { loadSubscribers() }, [])
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!email.trim()) return
     setAdding(true)
-    // TODO: POST to /api/subscribers
-    setTimeout(() => { setAdding(false); setEmail(''); setName('') }, 1000)
+    await fetch('/api/subscribers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), first_name: name.trim() || undefined }),
+    })
+    setEmail('')
+    setName('')
+    setAdding(false)
+    await loadSubscribers()
   }
+
+  const activeCount = subscribers.filter(s => s.status === 'active').length
 
   return (
     <div className="px-8 py-8 max-w-5xl">
@@ -77,11 +104,15 @@ export default function SubscribersPage() {
             <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--fount-border)' }}>
               <h2 className="text-sm font-semibold" style={{ color: 'var(--fount-text)' }}>Subscribers</h2>
               <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--fount-accent-light)', color: 'var(--fount-accent)' }}>
-                {subscribers.length} total
+                {loading ? '…' : `${activeCount} active`}
               </span>
             </div>
 
-            {subscribers.length === 0 ? (
+            {loading ? (
+              <div className="px-5 py-10 flex justify-center">
+                <Loader2 size={20} className="animate-spin" style={{ color: 'var(--fount-text-muted)' }} />
+              </div>
+            ) : subscribers.length === 0 ? (
               <div className="px-5 py-12 text-center">
                 <Users size={32} className="mx-auto mb-3" style={{ color: 'var(--fount-text-muted)' }} />
                 <p className="text-sm font-medium" style={{ color: 'var(--fount-text)' }}>No subscribers yet</p>
